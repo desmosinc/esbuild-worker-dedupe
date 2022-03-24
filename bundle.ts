@@ -2,6 +2,11 @@
 import * as path from "path";
 import * as esbuild from "esbuild";
 import * as assert from "assert";
+import * as acorn from 'acorn';
+import * as estree from 'estree';
+import mkdirp from 'mkdirp';
+import { writeFile } from "fs/promises";
+
 
 const WORKER_SOURCE_IMPORT_PATTERN = /^inlined-worker!/;
 
@@ -75,6 +80,11 @@ async function buildMainAndWorker({
   assertDefined(workerBundle, "worker bundle");
   assertDefined(mainBundle, "main bundle");
 
+  await mkdirp('build/split');
+  await writeFile('build/split/shared.js', shared.contents);
+  await writeFile('build/split/worker.js', workerBundle.contents);
+  await writeFile('build/split/main.js', mainBundle.contents);
+
   return {
     ...result,
     chunks: {
@@ -106,10 +116,11 @@ async function buildInlinedWorker(opts: {
           build.onResolve({ filter: /^.*$/ }, async (args) => {
             if (args.kind === "entry-point") {
               return {
+                path: args.path,
                 namespace: PLUGIN_NS,
                 pluginData: { type: "entry" },
               };
-            } else if (args.kind === "import-statement") {
+            } else {
               // There are only two types of import statements that should be left in the bundled code: to the shared module and the
               // custom 'inlined-worker!./path/to/worker' one.
               if (WORKER_SOURCE_IMPORT_PATTERN.test(args.path)) {
@@ -119,7 +130,7 @@ async function buildInlinedWorker(opts: {
                   pluginData: { type: "worker" },
                 };
               } else {
-                assert.ok(/\.\/shared(.js)?/.test(args.path), "import targets shared module");
+                assert.ok(/\.\/shared(.js)?/.test(args.path), "import targets shared module " + args.path + " from " + args.importer);
                 return {
                   path: './shared',
                   namespace: PLUGIN_NS,
@@ -127,15 +138,13 @@ async function buildInlinedWorker(opts: {
                 };
               }
             }
-
-            assertDefined(undefined, "Unexpected resolve kind " + args.kind);
           });
 
           build.onLoad(
             { filter: /^.*$/, namespace: PLUGIN_NS },
             async (args) => {
               if (args.pluginData.type === "entry") {
-                return { content: chunks.main.contents, loader: "js" };
+                return { contents: chunks.main.contents, loader: "js" };
               } else if (args.pluginData.type === "shared") {
                 const meta = metafile.outputs["out-split/shared.js"];
                 assertDefined(meta, "metafile entry for shared.js");
@@ -161,29 +170,33 @@ async function buildInlinedWorker(opts: {
 
 // import {a, b} from 'path'
 const IMPORT_PATTERN =
-  /^\s*import\s*({\s*(.*,?)+\s*})\s*from\s*(['"][^'"]*['"])/gm;
-// export const a =
-const EXPORT_CONST_PATTERN = /^\s*export\s*const\s*([a-zA-Z]+)\s*=/gm;
-// export {a, b, c}
-const EXPORT_OBJECT_PATTERN = /^\s*export\s*({\s*(.+,?)+\s*})/gm;
+  /^\s*import\s*({\s*([^,}]+,?\s*)+})\s*from\s*(['"][^'"]+['"])/gm;
 
 function generateSharedChunkCode(
   sharedModuleSource: string,
   exportNames: string[]
 ) {
-  let functionBody = `
-const __chunkExports = {};
-${sharedModuleSource}
-return __chunkExports;`;
+  const EXPORTS_VAR = '__chunkExports'
 
-  // Replace export statements with assignents to __chunkExports
-  functionBody = functionBody
-    .replace(EXPORT_CONST_PATTERN, (_, g0) => `__chunkExports.${g0} =`)
-    .replace(
-      EXPORT_OBJECT_PATTERN,
-      (_, g0) => `Object.assign(__chunkExports, ${g0})`
-    );
-  // TODO: complain if we see any other kind of export (e.g. export default, export function)
+  const node = acorn.parse(sharedModuleSource, {sourceType: 'module', ecmaVersion: 2020}) as (acorn.Node & estree.Program);
+  const exports: [start: number, end: number, replacement: string][] = [];
+  for (const statement of node.body) {
+    if (statement.type === 'ExportNamedDeclaration') {
+      const replacement = compileExport(statement, EXPORTS_VAR);
+      const {start, end} = (statement as acorn.Node & estree.Node);
+      exports.unshift([start, end, replacement]);
+    }
+  }
+
+  let compiled = sharedModuleSource;
+  for (const [start, end, replacement] of exports) {
+    compiled = compiled.slice(0, start) + replacement + compiled.slice(end);
+  }
+
+  const functionBody = `
+const ${EXPORTS_VAR} = {};
+${compiled}
+return ${EXPORTS_VAR};`;
 
   return `
 export const __sharedModuleSource = ${stringifyCodeNicely(functionBody)}
@@ -212,11 +225,21 @@ if (typeof Blob !== 'undefined' && URL && typeof URL.createObjectURL === 'functi
     URL.revokeObjectURL(workerURL);
   }
 } else {
+  // Just for testing in Node
   createWorker = () => {
     (new Function(__workerModuleSource))();
   }
 }
 `;
+}
+
+function compileExport(e: estree.ExportNamedDeclaration, target: string) {
+  if (!e.declaration) {
+    // export {a, v1 as b, ...}
+    return `Object.assign(${target}, {${e.specifiers.map(spec => `${spec.exported.name}: ${spec.local.name}`)}})`
+  } else {
+    throw new Error('Unimplemented: export with declaration');
+  }
 }
 
 function stringifyCodeNicely(source: string) {

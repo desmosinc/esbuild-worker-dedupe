@@ -100,6 +100,7 @@ doSomething();
       URL.revokeObjectURL(workerURL);
     };
   } else {
+    // Just for testing in Node
     createWorker = () => {
       new Function(__workerModuleSource)();
     };
