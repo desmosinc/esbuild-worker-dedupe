@@ -1,0 +1,12 @@
+{
+  "name": "esbuild-worker-dedupe",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^17.0.23",
+    "esbuild": "^0.14.27",
+    "ts-node": "^10.7.0",
+    "typescript": "^4.6.2"
+  }
+}
