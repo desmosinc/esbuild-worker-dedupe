@@ -221,8 +221,9 @@ export let createWorker;
 if (typeof Blob !== 'undefined' && URL && typeof URL.createObjectURL === 'function') {
   createWorker = () => {
     const workerURL = URL.createObjectURL(new Blob([__workerModuleSource], { type: 'application/javascript' }))
-    worker = new Worker(workerURL);
+    const worker = new Worker(workerURL);
     URL.revokeObjectURL(workerURL);
+    return worker;
   }
 } else {
   // Just for testing in Node
