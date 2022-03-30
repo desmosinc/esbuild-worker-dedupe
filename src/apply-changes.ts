@@ -6,6 +6,7 @@ export interface Change {
 }
 
 export function applyChanges(code: string, changes: Change[]) {
+  console.time('applyChanges')
   changes.sort((a, b) => a.range[0] - b.range[0]);
 
   let prevIndex = 0;
@@ -17,5 +18,6 @@ export function applyChanges(code: string, changes: Change[]) {
     prevIndex = change.range[1];
   }
   out += code.slice(prevIndex);
+  console.timeEnd('applyChanges')
   return out;
 }

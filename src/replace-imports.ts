@@ -4,14 +4,19 @@ import * as estree from "estree";
 import { applyChanges, Change } from "./apply-changes";
 import { assert } from "./assert";
 
-export function replaceImports(code: string, getExportsObjectName: (i: estree.ImportDeclaration) => string | false) {
+export function replaceImports(
+  code: string,
+  getExportsObjectName: (i: estree.ImportDeclaration) => string | false
+) {
+  console.time("replaceImports::acorn");
   const ast = acorn.parse(code, {
     sourceType: "module",
     ecmaVersion: 2020,
     ranges: true,
     allowReturnOutsideFunction: true,
-    locations: true
+    locations: true,
   }) as estree.Node & acorn.Node;
+  console.timeEnd("replaceImports::acorn");
 
   const changes: Change[] = [];
 
@@ -23,23 +28,24 @@ export function replaceImports(code: string, getExportsObjectName: (i: estree.Im
   for (const declaration of imports) {
     const exportsObject = getExportsObjectName(declaration);
     if (exportsObject) {
-      assert(declaration.range, 'range');
+      assert(declaration.range, "range");
       changes.push({
         range: declaration.range,
-        replacement: ''
-      })
+        replacement: "",
+      });
       for (const spec of declaration.specifiers) {
         importIdentifiers.set(spec.local, exportsObject);
       }
     }
-
   }
 
+  console.time("replaceImports::escope");
   const manager = escope.analyze(ast, {
     optimistic: true,
     sourceType: "module",
     ecmaVersion: 11,
   });
+  console.timeEnd("replaceImports::escope");
 
   for (const scope of manager.scopes) {
     for (const ref of scope.references) {
@@ -48,11 +54,11 @@ export function replaceImports(code: string, getExportsObjectName: (i: estree.Im
         const exports = importIdentifiers.get(identifier);
         if (exports) {
           const range = ref.identifier.range;
-          assert(range, 'range is defined');
+          assert(range, "range is defined");
           changes.push({
             range,
-            replacement: `${exports}['${identifier.name}']`
-          })
+            replacement: `${exports}['${identifier.name}']`,
+          });
         }
       }
     }

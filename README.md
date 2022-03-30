@@ -5,7 +5,7 @@ Proof of concept for inlining web worker code with esbuild with shared dependenc
 
 ```sh
 yarn
-./bundle.ts
+./bundle.ts --main test/basic/main.ts --worker test/basic/worker.ts --outdir build
 cat build/main.ts # notice that the code from shared.ts only appears once
 open index.thml # check the JS console to see that the main thread and worker code executed successfully.
 ```
