@@ -49,23 +49,18 @@ var SharedThing = class {
 export { SharedThing };
 ```
 
-Next, we bundle `main.js` from the previous step, with three key customizations:
-1. Resolve the `inlined-worker!./worker` import instead of skipping it.
-2. Transform the `shared.js` so that it:
-    a. holds the original source of `shared.js` in a string and exports it as `__sharedModuleSource`
-    b. evaluates that string immediately to provide the _actual_ exports from `shared.js` (e.g. `SharedThing` in the example above)
-3. Transform `worker.js`:
-    a. replace its import of the actual exports from `shared.js` with `import {__sharedModuleSource}`.
-    b. have it create a `__workerModuleSource` string holding code that first evaluates __sharedModuleSource to get the shared module exports and then evaluates the source of `worker.js`.
-    c. export a `createWorker()` function which, when called, creates an object URL from the module source and instantiates a `Worker` with it (or, in Node, just evaluates it directly for testing purposes).
+Next, we manually bundle the outputs from the previous step:
+1. From `shared.js`, emit code that:
+    a. stores the original source of `shared.js` in `__sharedModuleSource`
+    b. evaluates that string immediately to provide the _actual_ exports from `shared.js` (e.g. `SharedThing` in the example above), storing them as `__sharedModuleExports`
+2. From `worker.js`, emit code that creates a `__workerModuleSource` string containing code that first evaluates `__sharedModuleSource` to get the shared module exports and then evaluates the source of `worker.js`. Using this string, create an object URL with which to instantiate the worker.
 
 Example output:
 
 ```js
 (() => {
-  // inline-deduped-worker:./shared
-  var __sharedModuleSource = `
-
+// shared.js
+const __sharedModuleSource = `
 const __chunkExports = {};
 // src/shared.ts
 var SharedThing = class {
@@ -73,42 +68,45 @@ var SharedThing = class {
     this.id = Math.random();
   }
 };
-Object.assign(__chunkExports, {
-  SharedThing
-});
 
-return __chunkExports;`;
-  var { SharedThing } = new Function(__sharedModuleSource)();
+Object.defineProperty(__chunkExports, 'SharedThing', { get: () => SharedThing });
 
-  // inline-deduped-worker:./worker
-  var __workerModuleSource = `
-const __imports = (function (){${__sharedModuleSource}})();
-const {
-  SharedThing
-} = __imports;
-
+return __chunkExports;`
+const __sharedModuleExports = (new Function(__sharedModuleSource))()
+const __workerSourceExports = (function () {
+  // worker.js
+  const __workerModuleSource = `
+  const __sharedModuleExports = (function (){${__sharedModuleSource}})();` +
+    `
 // src/worker.ts
-function doSomething() {
-  console.log("worker", new SharedThing().id);
+function startWorker() {
+  console.log(\"worker\", new __sharedModuleExports['SharedThing']().id);
 }
-doSomething();
-`;
-  var createWorker;
-  if (typeof Blob !== "undefined" && URL && typeof URL.createObjectURL === "function") {
-    createWorker = () => {
-      const workerURL = URL.createObjectURL(new Blob([__workerModuleSource], { type: "application/javascript" }));
-      worker = new Worker(workerURL);
-      URL.revokeObjectURL(workerURL);
-    };
+startWorker();`;
+  if (typeof Blob !== 'undefined' && URL && typeof URL.createObjectURL === 'function') {
+    return {
+      createWorker: () => {
+        const workerURL = URL.createObjectURL(new Blob([__workerModuleSource], { type: 'application/javascript' }))
+        const worker = new Worker(workerURL);
+        URL.revokeObjectURL(workerURL);
+        return worker;
+      }
+    }
   } else {
     // Just for testing in Node
-    createWorker = () => {
-      new Function(__workerModuleSource)();
-    };
+    return {
+      createWorker: () => {
+      (new Function(__workerModuleSource))();
+      }
+    }
   }
-
-  // src/main.ts
-  console.log("main", new SharedThing().id);
-  createWorker();
 })();
+
+
+// src/main.ts
+
+console.log("main", new __sharedModuleExports['SharedThing']().id);
+__workerSourceExports['createWorker']();
+
+})()
 ```
