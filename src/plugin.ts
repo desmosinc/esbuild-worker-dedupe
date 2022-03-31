@@ -16,8 +16,9 @@ export function inlineDedupedWorker({
     name: "inline-deduped-worker",
     setup(build) {
       const initialOptions = { ...build.initialOptions };
+      const outdir = initialOptions.outdir || '/out';
       build.initialOptions.write = false;
-      build.initialOptions.outdir = "/out";
+      build.initialOptions.outdir = outdir;
       build.initialOptions.splitting = true;
       build.initialOptions.format = "esm";
       build.initialOptions.chunkNames = "__shared_chunk";
@@ -37,9 +38,9 @@ export function inlineDedupedWorker({
         );
       }
 
-      const mainEntryPoint = initialOptions.entryPoints?.main;
+      const mainEntryPoint = initialOptions.entryPoints.main;
 
-      const createWorkerPattern = new RegExp(escapeRegExp(createWorkerModule));
+      const createWorkerPattern = new RegExp('^' + escapeRegExp(createWorkerModule) + '$');
 
       build.onResolve({ filter: createWorkerPattern }, () => ({
         external: true,
@@ -55,10 +56,10 @@ export function inlineDedupedWorker({
         );
 
         const mainBundle = result.outputFiles.find(
-          (o) => o.path === "/out/main.js"
+          (o) => o.path.endsWith("main.js")
         );
         const workerBundle = result.outputFiles.find(
-          (o) => o.path === "/out/worker.js"
+          (o) => o.path.endsWith("worker.js")
         );
         const shared = result.outputFiles.find(
           (o) => o.path.indexOf("__shared_chunk") >= 0
@@ -67,33 +68,44 @@ export function inlineDedupedWorker({
         assert(mainBundle, "mainBundle");
         assert(shared, "shared");
 
-        const finalBundle = inlineWorker({
+        const finalJSBundle = inlineWorker({
           main: mainBundle.text,
           worker: workerBundle.text,
           shared: shared.text,
           createWorkerModule,
         });
 
-        const finalBundlePath =
+        const finalJSBundlePath =
           initialOptions.outfile ||
           path.resolve(
             initialOptions.outdir || process.cwd(),
             path.basename(mainEntryPoint)
           );
 
+        const cssFiles = result.outputFiles.filter(f => f.path.endsWith('.css'));
+
         if (splitOutdir) {
           for (const f of result.outputFiles) {
-            f.path = f.path.replace("/out", splitOutdir);
+            f.path = f.path.replace(outdir, splitOutdir);
           }
         } else {
           result.outputFiles = [];
         }
 
         result.outputFiles.push({
-          path: finalBundlePath,
-          text: finalBundle,
-          contents: Buffer.from(finalBundle),
+          path: finalJSBundlePath,
+          text: finalJSBundle,
+          contents: Buffer.from(finalJSBundle),
         });
+
+        if (cssFiles.length) {
+          const combined = cssFiles.map(f => f.text).join('\n');
+          result.outputFiles.push({
+            path: finalJSBundlePath.replace(/\.js$/, '.css'),
+            text: combined,
+            contents: Buffer.from(combined)
+          })
+        }
 
         if (initialOptions.write) {
           for (const f of result.outputFiles) {

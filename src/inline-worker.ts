@@ -28,22 +28,22 @@ export function inlineWorker({
   createWorkerModule: string;
 }) {
   console.time("compile shared");
-  const sharedMdouleCompiled = replaceExports(shared, "__chunkExports");
+  const sharedModuleCompiled = replaceExports(shared, "__chunkExports");
   console.timeEnd("compile shared");
 
   console.time("compile main");
-  const mainModuleCompiled = replaceImports(main, (i) => {
+  const mainModuleCompiled = replaceExports(replaceImports(main, (i) => {
     const source = i.source.value as string;
     if (source === createWorkerModule) return "__workerSourceExports";
     return "__sharedModuleExports";
-  });
+  }), `(typeof self !== 'undefined' ? self : this)`);
   console.timeEnd("compile main");
 
   console.time("compile worker");
-  const workerModuleCompiled = replaceImports(
+  const workerModuleCompiled = replaceExports(replaceImports(
     worker,
     () => "__sharedModuleExports"
-  );
+  ), `(typeof self !== 'undefined' ? self : this)`);
   console.timeEnd("compile worker");
 
   return `
@@ -51,7 +51,7 @@ export function inlineWorker({
   // shared.js
   const __sharedModuleSource = ${stringifyCodeNicely(`
   const __chunkExports = {};
-  ${sharedMdouleCompiled}
+  ${sharedModuleCompiled}
   return __chunkExports;`)}
   const __sharedModuleExports = (new Function(__sharedModuleSource))()
   const __workerSourceExports = (function () {
@@ -82,10 +82,9 @@ export function inlineWorker({
 }
 
 function stringifyCodeNicely(source: string) {
-  const s = JSON.stringify(source);
   return (
-    "`\n" +
-    s.slice(1, -1).replace(/\\n/g, "\n").replace(/`/, "\\`").trim() +
+    "`" +
+    source.replace(/[`\$\\]/g, (char) => '\\' + char).trim() +
     "`"
   );
 }

@@ -26,15 +26,20 @@ export function replaceImports(
   );
   const importIdentifiers = new Map<estree.Identifier, string>();
   for (const declaration of imports) {
-    const exportsObject = getExportsObjectName(declaration);
-    if (exportsObject) {
+    const exportsObjectName = getExportsObjectName(declaration);
+    if (exportsObjectName) {
       assert(declaration.range, "range");
       changes.push({
         range: declaration.range,
         replacement: "",
       });
+
       for (const spec of declaration.specifiers) {
-        importIdentifiers.set(spec.local, exportsObject);
+        const replacement = spec.type === 'ImportNamespaceSpecifier' ? exportsObjectName :
+          spec.type === 'ImportDefaultSpecifier' ? `${exportsObjectName}.default` :
+          `${exportsObjectName}['${spec.imported.name}']`
+
+        importIdentifiers.set(spec.local, replacement);
       }
     }
   }
@@ -50,15 +55,16 @@ export function replaceImports(
   for (const scope of manager.scopes) {
     for (const ref of scope.references) {
       const variable = ref.resolved;
+      const range = ref.identifier.range;
+      assert(range, "range is defined");
       for (const identifier of variable?.identifiers ?? []) {
-        const exports = importIdentifiers.get(identifier);
-        if (exports) {
-          const range = ref.identifier.range;
-          assert(range, "range is defined");
+        const replacement = importIdentifiers.get(identifier);
+        if (replacement) {
           changes.push({
             range,
-            replacement: `${exports}['${identifier.name}']`,
+            replacement,
           });
+          break;
         }
       }
     }
