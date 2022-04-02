@@ -1,5 +1,6 @@
 import { replaceImports } from "./replace-imports";
 import { replaceExports } from "./replace-exports";
+import { Context } from "./context";
 
 /**
  * Build a single bundle with the `worker` source inlined from the output of a code-splitting build
@@ -10,6 +11,7 @@ export function inlineWorker({
   worker,
   shared,
   createWorkerModule,
+  ctx,
 }: {
   /**
    * The main thread code. Expected to be an ES module with at most two imports: one from the shared chunk and one
@@ -26,25 +28,31 @@ export function inlineWorker({
    */
   shared: string;
   createWorkerModule: string;
+  ctx: Context;
 }) {
-  console.time("compile shared");
-  const sharedModuleCompiled = replaceExports(shared, "__chunkExports");
-  console.timeEnd("compile shared");
+  ctx.time("compile shared");
+  const sharedModuleCompiled = replaceExports(ctx, shared, "__chunkExports");
+  ctx.timeEnd("compile shared");
 
-  console.time("compile main");
-  const mainModuleCompiled = replaceExports(replaceImports(main, (i) => {
-    const source = i.source.value as string;
-    if (source === createWorkerModule) return "__workerSourceExports";
-    return "__sharedModuleExports";
-  }), `(typeof self !== 'undefined' ? self : this)`);
-  console.timeEnd("compile main");
+  ctx.time("compile main");
+  const mainModuleCompiled = replaceExports(
+    ctx,
+    replaceImports(ctx, main, (i) => {
+      const source = i.source.value as string;
+      if (source === createWorkerModule) return "__workerSourceExports";
+      return "__sharedModuleExports";
+    }),
+    `(typeof self !== 'undefined' ? self : this)`
+  );
+  ctx.timeEnd("compile main");
 
-  console.time("compile worker");
-  const workerModuleCompiled = replaceExports(replaceImports(
-    worker,
-    () => "__sharedModuleExports"
-  ), `(typeof self !== 'undefined' ? self : this)`);
-  console.timeEnd("compile worker");
+  ctx.time("compile worker");
+  const workerModuleCompiled = replaceExports(
+    ctx,
+    replaceImports(ctx, worker, () => "__sharedModuleExports"),
+    `(typeof self !== 'undefined' ? self : this)`
+  );
+  ctx.timeEnd("compile worker");
 
   return `
   (() => {
@@ -82,9 +90,5 @@ export function inlineWorker({
 }
 
 function stringifyCodeNicely(source: string) {
-  return (
-    "`" +
-    source.replace(/[`\$\\]/g, (char) => '\\' + char).trim() +
-    "`"
-  );
+  return "`" + source.replace(/[`$\\]/g, (char) => "\\" + char).trim() + "`";
 }

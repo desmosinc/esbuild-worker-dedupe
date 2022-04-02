@@ -3,12 +3,14 @@ import * as escope from "escope";
 import * as estree from "estree";
 import { applyChanges, Change } from "./apply-changes";
 import { assert } from "./assert";
+import { Context } from "./context";
 
 export function replaceImports(
+  context: Context,
   code: string,
   getExportsObjectName: (i: estree.ImportDeclaration) => string | false
 ) {
-  console.time("replaceImports::acorn");
+  context.time("replaceImports::acorn");
   const ast = acorn.parse(code, {
     sourceType: "module",
     ecmaVersion: 2020,
@@ -16,7 +18,7 @@ export function replaceImports(
     allowReturnOutsideFunction: true,
     locations: true,
   }) as estree.Node & acorn.Node;
-  console.timeEnd("replaceImports::acorn");
+  context.timeEnd("replaceImports::acorn");
 
   const changes: Change[] = [];
 
@@ -35,22 +37,25 @@ export function replaceImports(
       });
 
       for (const spec of declaration.specifiers) {
-        const replacement = spec.type === 'ImportNamespaceSpecifier' ? exportsObjectName :
-          spec.type === 'ImportDefaultSpecifier' ? `${exportsObjectName}.default` :
-          `${exportsObjectName}['${spec.imported.name}']`
+        const replacement =
+          spec.type === "ImportNamespaceSpecifier"
+            ? exportsObjectName
+            : spec.type === "ImportDefaultSpecifier"
+            ? `${exportsObjectName}.default`
+            : `${exportsObjectName}['${spec.imported.name}']`;
 
         importIdentifiers.set(spec.local, replacement);
       }
     }
   }
 
-  console.time("replaceImports::escope");
+  context.time("replaceImports::escope");
   const manager = escope.analyze(ast, {
     optimistic: true,
     sourceType: "module",
     ecmaVersion: 11,
   });
-  console.timeEnd("replaceImports::escope");
+  context.timeEnd("replaceImports::escope");
 
   for (const scope of manager.scopes) {
     for (const ref of scope.references) {

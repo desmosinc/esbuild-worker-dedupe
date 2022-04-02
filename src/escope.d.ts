@@ -64,11 +64,16 @@ declare module "escope" {
     tainted: boolean;
     /** If reference is writeable, this is the tree being written to it.  */
     writeExpr: estree.Node;
-  };
+  }
 
   class Variable {
     /** List of defining occurrences of this variable (like in 'var ...' statements or as parameter), as custom objects.  */
-    defs: {type: string; name: estree.Identifier; node: estree.Node; parent: estree.Node}[];
+    defs: {
+      type: string;
+      name: estree.Identifier;
+      node: estree.Node;
+      parent: estree.Node;
+    }[];
     /** List of defining occurrences of this variable (like in 'var ...' statements or as parameter), as AST nodes.  */
     identifiers: estree.Identifier[];
     name: string;

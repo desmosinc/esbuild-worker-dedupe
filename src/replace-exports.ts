@@ -1,14 +1,19 @@
 import * as acorn from "acorn";
 import * as estree from "estree";
 import { applyChanges, Change } from "./apply-changes";
+import { Context } from "./context";
 
-export function replaceExports(code: string, exportsVariable: string) {
-  console.time("repaceExports::acorn");
+export function replaceExports(
+  context: Context,
+  code: string,
+  exportsVariable: string
+) {
+  context.time("repaceExports::acorn");
   const node = acorn.parse(code, {
     sourceType: "module",
     ecmaVersion: 2020,
   }) as acorn.Node & estree.Program;
-  console.timeEnd("repaceExports::acorn");
+  context.timeEnd("repaceExports::acorn");
 
   const changes: Change[] = [];
 

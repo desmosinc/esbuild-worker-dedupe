@@ -1,18 +1,19 @@
 #!/usr/bin/env node -r ts-node/register/transpile-only
+/* eslint-disable no-console */
 import * as esbuild from "esbuild";
-import { inlineDedupedWorker } from "./src/plugin";
-import yargs from 'yargs';
+import { inlineDedupedWorker } from "./src";
+import yargs from "yargs";
 
 async function main() {
   const argv = await yargs.options({
-    main: {type: 'string', demand: true},
-    worker: {type: 'string', demand: true},
-    outdir: {type: 'string'},
-    outfile: {type: 'string'}
+    main: { type: "string", demand: true },
+    worker: { type: "string", demand: true },
+    outdir: { type: "string" },
+    outfile: { type: "string" },
   }).argv;
 
   await esbuild.build({
-    entryPoints: {main: argv.main, worker: argv.worker},
+    entryPoints: { main: argv.main, worker: argv.worker },
     outdir: argv.outdir,
     outfile: argv.outfile,
     bundle: true,
@@ -21,7 +22,7 @@ async function main() {
     chunkNames: "shared",
     format: "esm",
     metafile: true,
-    plugins: [inlineDedupedWorker({createWorkerModule: 'create-worker'})]
+    plugins: [inlineDedupedWorker({ createWorkerModule: "create-worker" })],
   });
 }
 
