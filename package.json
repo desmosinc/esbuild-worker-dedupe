@@ -1,12 +1,9 @@
 {
-  "name": "@desmosinc/esbuild-worker-dedupe",
+  "name": "@desmos/esbuild-worker-dedupe",
   "version": "1.0.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/desmosinc/esbuild-worker-dedupe"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   },
   "files": [
     "**/*.ts",
