@@ -11,9 +11,9 @@
   "files": [
     "**/*.ts",
     "**/*.json",
-    "dist"
+    "build"
   ],
-  "main": "index.js",
+  "main": "build/index.js",
   "license": "MIT",
   "scripts": {
     "test": "mkdir -p test/build && rm -rf test/build/* && ./bundle.ts --main test/basic/main.ts --worker test/basic/worker.ts --outdir test/build && node test/build/main.js",
