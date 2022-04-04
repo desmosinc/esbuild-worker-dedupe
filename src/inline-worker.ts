@@ -83,18 +83,26 @@ export async function inlineWorker(opts: {
   mainMs
     .prepend(
       `
-  (() => {
+(() => {
   // shared.js
-  const __sharedModuleSource = ${stringifyCodeNicely(`
-  const __chunkExports = {};
-  ${sharedModuleCompiled}
-  return __chunkExports;`)}
-  const __sharedModuleExports = (new Function(__sharedModuleSource))()
+  const __sharedModuleFn = () => {
+    const __chunkExports = {};
+${sharedModuleCompiled}
+    return __chunkExports;
+  };
+  const __sharedModuleExports = __sharedModuleFn();
+
+  const __workerFn = (__sharedModuleExports) => {
+${workerModuleCompiled}
+  };
+
   const __workerSourceExports = (function () {
     // worker.js
     const __workerModuleSource = \`
-    const __sharedModuleExports = (function (){\${__sharedModuleSource}})();\` +
-      ${stringifyCodeNicely(workerModuleCompiled)};
+      const __sharedModuleFn = \${__sharedModuleFn.toString()};
+      const __workerFn = \${__workerFn.toString()};
+      __workerFn(__sharedModuleFn());\`
+
     let createWorker;
     if (typeof Blob !== 'undefined' && URL && typeof URL.createObjectURL === 'function') {
       createWorker = () => {
@@ -131,8 +139,4 @@ export async function inlineWorker(opts: {
   }
 
   return mainMs.toString() + map;
-}
-
-function stringifyCodeNicely(source: string) {
-  return "`" + source.replace(/[`$\\]/g, (char) => "\\" + char).trim() + "`";
 }
