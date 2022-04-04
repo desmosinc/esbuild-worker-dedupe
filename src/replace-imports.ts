@@ -75,5 +75,5 @@ export function replaceImports(
     }
   }
 
-  return applyChanges(code, changes);
+  return changes;
 }

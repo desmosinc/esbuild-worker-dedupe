@@ -33,6 +33,9 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
         build.initialOptions.splitting = true;
         build.initialOptions.format = "esm";
         build.initialOptions.chunkNames = "__shared_chunk";
+        if (initialOptions.sourcemap) {
+          build.initialOptions.sourcemap = "external";
+        }
 
         assert(
           !Array.isArray(initialOptions.entryPoints),
@@ -70,7 +73,7 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
           assert(
             result.outputFiles.filter((o) => o.path.endsWith(".js")).length ===
               3,
-            `Expected exactly 3 output files but found ${result.outputFiles.map(
+            `Expected exactly 3 JS output files but found ${result.outputFiles.map(
               (f) => f.path
             )}`
           );
@@ -82,16 +85,30 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
             o.path.endsWith("worker.js")
           );
           const shared = result.outputFiles.find(
-            (o) => o.path.indexOf("__shared_chunk") >= 0
+            (o) =>
+              o.path.endsWith(".js") && o.path.indexOf("__shared_chunk") >= 0
           );
           assert(workerBundle, "workerBundle");
           assert(mainBundle, "mainBundle");
           assert(shared, "shared");
 
-          const finalJSBundle = inlineWorker({
+          const sourcemaps = {
+            main: result.outputFiles.find(
+              (o) => o.path === mainBundle.path + ".map"
+            )?.text,
+            worker: result.outputFiles.find(
+              (o) => o.path === workerBundle.path + ".map"
+            )?.text,
+            shared: result.outputFiles.find(
+              (o) => o.path === shared.path + ".map"
+            )?.text,
+          };
+
+          const finalJSBundle = await inlineWorker({
             ctx,
             main: mainBundle.text,
             worker: workerBundle.text,
+            sourcemaps,
             shared: shared.text,
             createWorkerModule,
           });

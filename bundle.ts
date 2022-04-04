@@ -22,6 +22,7 @@ async function main() {
     chunkNames: "shared",
     format: "esm",
     metafile: true,
+    sourcemap: "inline",
     plugins: [inlineDedupedWorker({ createWorkerModule: "create-worker" })],
   });
 }

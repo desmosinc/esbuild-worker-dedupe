@@ -1,6 +1,6 @@
 import * as acorn from "acorn";
 import * as estree from "estree";
-import { applyChanges, Change } from "./apply-changes";
+import { Change } from "./apply-changes";
 import { Context } from "./context";
 
 export function replaceExports(
@@ -9,7 +9,7 @@ export function replaceExports(
   exportsVariable: string
 ) {
   context.time("repaceExports::acorn");
-  const node = acorn.parse(code, {
+  const node = acorn.parse(code.toString(), {
     sourceType: "module",
     ecmaVersion: 2020,
   }) as acorn.Node & estree.Program;
@@ -25,7 +25,7 @@ export function replaceExports(
     }
   }
 
-  return applyChanges(code, changes);
+  return changes;
 }
 
 function compileExport(e: estree.ExportNamedDeclaration, target: string) {

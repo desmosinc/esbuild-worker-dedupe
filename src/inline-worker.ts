@@ -1,18 +1,15 @@
 import { replaceImports } from "./replace-imports";
 import { replaceExports } from "./replace-exports";
 import { Context } from "./context";
+import MagicString from "magic-string";
+import { applyChanges } from "./apply-changes";
+import { composeSourceMaps, inlineSourceMapComment } from "./source-maps";
 
 /**
  * Build a single bundle with the `worker` source inlined from the output of a code-splitting build
  * with two entrypoints: the main thread code and the worker code.
  */
-export function inlineWorker({
-  main,
-  worker,
-  shared,
-  createWorkerModule,
-  ctx,
-}: {
+export async function inlineWorker(opts: {
   /**
    * The main thread code. Expected to be an ES module with at most two imports: one from the shared chunk and one
    * a module with the name given by `createWorkerModule` importing `{createWorker}`, e.g.
@@ -27,34 +24,65 @@ export function inlineWorker({
    * The shared chunk. Expected to be an ES module with no imports.
    */
   shared: string;
+  sourcemaps: Record<"main" | "worker" | "shared", string | undefined>;
   createWorkerModule: string;
   ctx: Context;
 }) {
+  const { ctx, createWorkerModule } = opts;
+
+  const mainMs = new MagicString(opts.main);
+  const sharedMs = new MagicString(opts.shared);
+  const workerMs = new MagicString(opts.worker);
+
   ctx.time("compile shared");
-  const sharedModuleCompiled = replaceExports(ctx, shared, "__chunkExports");
+  applyChanges(
+    sharedMs,
+    replaceExports(ctx, sharedMs.toString(), "__chunkExports")
+  );
+  const sharedModuleCompiled = sharedMs.toString();
   ctx.timeEnd("compile shared");
 
   ctx.time("compile main");
-  const mainModuleCompiled = replaceExports(
-    ctx,
-    replaceImports(ctx, main, (i) => {
+
+  applyChanges(
+    mainMs,
+    replaceExports(
+      ctx,
+      mainMs.toString(),
+      `(typeof self !== 'undefined' ? self : this)`
+    )
+  );
+
+  applyChanges(
+    mainMs,
+    replaceImports(ctx, mainMs.toString(), (i) => {
       const source = i.source.value as string;
       if (source === createWorkerModule) return "__workerSourceExports";
       return "__sharedModuleExports";
-    }),
-    `(typeof self !== 'undefined' ? self : this)`
+    })
   );
+
   ctx.timeEnd("compile main");
 
   ctx.time("compile worker");
-  const workerModuleCompiled = replaceExports(
-    ctx,
-    replaceImports(ctx, worker, () => "__sharedModuleExports"),
-    `(typeof self !== 'undefined' ? self : this)`
+  applyChanges(
+    workerMs,
+    replaceImports(ctx, workerMs.toString(), () => "__sharedModuleExports")
   );
+  applyChanges(
+    workerMs,
+    replaceExports(
+      ctx,
+      workerMs.toString(),
+      `(typeof self !== 'undefined' ? self : this)`
+    )
+  );
+  const workerModuleCompiled = workerMs.toString();
   ctx.timeEnd("compile worker");
 
-  return `
+  mainMs
+    .prepend(
+      `
   (() => {
   // shared.js
   const __sharedModuleSource = ${stringifyCodeNicely(`
@@ -84,9 +112,25 @@ export function inlineWorker({
 
     return {createWorker, default: {createWorker}};
   })();
-  ${mainModuleCompiled}
-  })()
-  `;
+  `
+    )
+    .append(`\n})()`);
+
+  let map = "";
+  if (opts.sourcemaps.main) {
+    const intermediateFileName = "<inline-worker-dedupe:generated>";
+    const sm = mainMs.generateMap({ source: intermediateFileName });
+    const combined = await composeSourceMaps({
+      currentMap: sm,
+      previousMap: {
+        map: JSON.parse(opts.sourcemaps.main),
+        sourceFile: intermediateFileName,
+      },
+    });
+    map = inlineSourceMapComment(combined);
+  }
+
+  return mainMs.toString() + map;
 }
 
 function stringifyCodeNicely(source: string) {
