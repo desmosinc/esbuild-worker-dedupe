@@ -84,32 +84,37 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
           const workerBundle = result.outputFiles.find((o) =>
             o.path.endsWith("worker.js")
           );
-          const shared = result.outputFiles.find(
+          const sharedBundle = result.outputFiles.find(
             (o) =>
               o.path.endsWith(".js") && o.path.indexOf("__shared_chunk") >= 0
           );
           assert(workerBundle, "workerBundle");
           assert(mainBundle, "mainBundle");
-          assert(shared, "shared");
+          assert(sharedBundle, "sharedBundle");
 
-          const sourcemaps = {
-            main: result.outputFiles.find(
+          let sourcemaps;
+          if (initialOptions.sourcemap) {
+            const main = result.outputFiles.find(
               (o) => o.path === mainBundle.path + ".map"
-            )?.text,
-            worker: result.outputFiles.find(
+            )?.text;
+            const worker = result.outputFiles.find(
               (o) => o.path === workerBundle.path + ".map"
-            )?.text,
-            shared: result.outputFiles.find(
-              (o) => o.path === shared.path + ".map"
-            )?.text,
-          };
+            )?.text;
+            const shared = result.outputFiles.find(
+              (o) => o.path === sharedBundle.path + ".map"
+            )?.text;
+            assert(main, "main sourcemap");
+            assert(worker, "worker sourcemap");
+            assert(shared, "shared sourcemap");
+            sourcemaps = { main, worker, shared };
+          }
 
           const finalJSBundle = await inlineWorker({
             ctx,
             main: mainBundle.text,
             worker: workerBundle.text,
             sourcemaps,
-            shared: shared.text,
+            shared: sharedBundle.text,
             createWorkerModule,
           });
 

@@ -1,17 +1,17 @@
 import * as acorn from "acorn";
 import * as escope from "escope";
 import * as estree from "estree";
-import { applyChanges, Change } from "./apply-changes";
+import MagicString from "magic-string";
 import { assert } from "./assert";
 import { Context } from "./context";
 
 export function replaceImports(
   context: Context,
-  code: string,
+  code: MagicString,
   getExportsObjectName: (i: estree.ImportDeclaration) => string | false
 ) {
   context.time("replaceImports::acorn");
-  const ast = acorn.parse(code, {
+  const ast = acorn.parse(code.original, {
     sourceType: "module",
     ecmaVersion: 2020,
     ranges: true,
@@ -19,8 +19,6 @@ export function replaceImports(
     locations: true,
   }) as estree.Node & acorn.Node;
   context.timeEnd("replaceImports::acorn");
-
-  const changes: Change[] = [];
 
   assert(ast.type === "Program", `Unexpected top-level node ${ast.type}`);
   const imports = ast.body.filter(
@@ -31,10 +29,9 @@ export function replaceImports(
     const exportsObjectName = getExportsObjectName(declaration);
     if (exportsObjectName) {
       assert(declaration.range, "range");
-      changes.push({
-        range: declaration.range,
-        replacement: "",
-      });
+      code.remove(declaration.range[0], declaration.range[1]);
+      code.addSourcemapLocation(declaration.range[0]);
+      code.addSourcemapLocation(declaration.range[1]);
 
       for (const spec of declaration.specifiers) {
         const replacement =
@@ -65,15 +62,12 @@ export function replaceImports(
       for (const identifier of variable?.identifiers ?? []) {
         const replacement = importIdentifiers.get(identifier);
         if (replacement) {
-          changes.push({
-            range,
-            replacement,
-          });
+          code.overwrite(range[0], range[1], replacement);
+          code.addSourcemapLocation(range[0]);
+          code.addSourcemapLocation(range[1]);
           break;
         }
       }
     }
   }
-
-  return changes;
 }

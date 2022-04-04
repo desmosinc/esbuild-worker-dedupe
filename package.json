@@ -15,7 +15,8 @@
   "scripts": {
     "test": "mkdir -p test/build && rm -rf test/build/* && ./bundle.ts --main test/basic/main.ts --worker test/basic/worker.ts --outdir test/build && node test/build/main.js",
     "prepare": "husky install",
-    "build-plugin": "rm -rf build && esbuild src/index.ts --outdir=build --bundle --platform=node --sourcemap=linked && cp src/types.ts build/index.d.ts",
+    "watch": "esbuild                      ./src/index.js --outdir=build --bundle --platform=node --external:source-map --main-fields=main --sourcemap=linked --watch",
+    "build-plugin": "rm -rf build && esbuild src/index.ts --outdir=build --bundle --platform=node --external:source-map --main-fields=main --sourcemap=linked && cp src/types.ts build/index.d.ts",
     "prepublishOnly": "yarn test && yarn build-plugin"
   },
   "dependencies": {

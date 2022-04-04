@@ -1,31 +1,29 @@
 import * as acorn from "acorn";
 import * as estree from "estree";
-import { Change } from "./apply-changes";
+import MagicString from "magic-string";
 import { Context } from "./context";
 
 export function replaceExports(
   context: Context,
-  code: string,
+  code: MagicString,
   exportsVariable: string
 ) {
   context.time("repaceExports::acorn");
-  const node = acorn.parse(code.toString(), {
+  const node = acorn.parse(code.original, {
     sourceType: "module",
     ecmaVersion: 2020,
   }) as acorn.Node & estree.Program;
   context.timeEnd("repaceExports::acorn");
 
-  const changes: Change[] = [];
-
   for (const statement of node.body) {
     if (statement.type === "ExportNamedDeclaration") {
       const replacement = compileExport(statement, exportsVariable);
       const { start, end } = statement as acorn.Node & estree.Node;
-      changes.push({ range: [start, end], replacement });
+      code.overwrite(start, end, replacement);
+      code.addSourcemapLocation(start);
+      code.addSourcemapLocation(end);
     }
   }
-
-  return changes;
 }
 
 function compileExport(e: estree.ExportNamedDeclaration, target: string) {
