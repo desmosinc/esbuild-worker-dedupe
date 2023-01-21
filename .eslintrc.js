@@ -21,5 +21,11 @@ module.exports = {
         "no-console": ["off"],
       },
     },
+    {
+      files: ["test/**/*.*"],
+      rules: {
+        "no-console": ["off"],
+      },
+    },
   ],
 };

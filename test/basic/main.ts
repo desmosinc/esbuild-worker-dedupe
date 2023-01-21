@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { SharedThing } from "./shared";
-// const { SharedThing } = require('./shared');
+import { createWorker } from "create-worker";
 
-import {createWorker} from 'create-worker'
+const results: any = ((window as any).results = {});
+results.main = new SharedThing().id;
 
-console.log('main', new SharedThing().id);
-
-createWorker();
+createWorker().addEventListener("message", (e) => {
+  results.worker = e.data.id;
+  (window as any).__testLoaded = true;
+});
