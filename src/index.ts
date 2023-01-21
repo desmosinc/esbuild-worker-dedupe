@@ -33,6 +33,10 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
         build.initialOptions.splitting = true;
         build.initialOptions.format = "esm";
         build.initialOptions.chunkNames = "__shared_chunk";
+        // If there's an outfile option, remove it, because we need to build with an outdir
+        // to get multiple chunks first. We'll use outfile when we combine them at the end.
+        delete build.initialOptions.outfile;
+
         if (initialOptions.sourcemap) {
           build.initialOptions.sourcemap = "external";
         }
