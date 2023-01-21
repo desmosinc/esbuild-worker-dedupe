@@ -81,7 +81,9 @@ export async function inlineWorker(opts: {
       createWorker = () => {
         const workerURL = URL.createObjectURL(new Blob([__workerModuleSource], { type: 'application/javascript' }))
         const worker = new Worker(workerURL);
-        URL.revokeObjectURL(workerURL);
+        worker.revokeObjectURL = () => {
+          URL.revokeObjectURL(workerURL);
+        }
         return worker;
       }
     } else {
