@@ -4,7 +4,7 @@ import { inlineDedupedWorker } from "../src";
 import { Driver } from "./driver";
 import yargs from "yargs";
 
-const MAX_TIME_MS = 60 * 1000;
+const MAX_TIME_MS = 5 * 1000;
 
 const tests: { label: string; fn: () => Promise<void> }[] = [
   {
@@ -49,17 +49,54 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
       );
     },
   },
+  {
+    label: "regression: object property shorthand bug",
+    fn: async () => {
+      const build = await esbuild.build({
+        entryPoints: {
+          main: `${__dirname}/property-shorthand/main.ts`,
+          worker: `${__dirname}/property-shorthand/worker.ts`,
+        },
+        bundle: true,
+        write: false,
+        outfile: "bundle.js",
+        plugins: [
+          inlineDedupedWorker({
+            createWorkerModule: "create-worker",
+          }),
+        ],
+      });
+
+      const js = build.outputFiles[0].text;
+
+      const driver = await getDriver();
+      await driver.load({
+        type: "html",
+        html: `
+          <html><head><script>
+          ${js}
+          </script></head></html>
+        `,
+      });
+      const { result, errors } = await driver.run(async (page) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return page.evaluate(function () {
+          return (window as any).results;
+        });
+      });
+      assert.deepEqual(errors, [], "no errors");
+      assert.ok(
+        result.main && result.worker && result.main !== result.worker,
+        "Worker loaded and worked"
+      );
+    },
+  },
 ];
 
 async function main() {
-  const timeout = setTimeout(() => {
-    console.error(`❌ tests timed out ${MAX_TIME_MS}, exiting...`);
-    process.exit(1);
-  }, MAX_TIME_MS);
-
   for (const { label, fn } of tests) {
     try {
-      await fn();
+      await withTimeout(fn, MAX_TIME_MS);
       console.log(`✅ ${label}`);
     } catch (e) {
       const message = (e as { message?: string } | undefined)?.message || e;
@@ -70,8 +107,6 @@ async function main() {
   if (driver) {
     driver.destroy();
   }
-
-  clearTimeout(timeout);
 }
 
 let driver: Driver | undefined;
@@ -88,6 +123,20 @@ function getArgv() {
       type: "boolean",
     },
   }).argv;
+}
+
+async function withTimeout(cb: () => Promise<void>, maxTime: number) {
+  return new Promise<void>((resolve, reject) => {
+    const t = setTimeout(() => {
+      reject(`test timed out after ${maxTime}ms`);
+    }, maxTime);
+    cb()
+      .then(() => {
+        clearTimeout(t);
+        resolve();
+      })
+      .catch(reject);
+  });
 }
 
 main().catch((e) => {
