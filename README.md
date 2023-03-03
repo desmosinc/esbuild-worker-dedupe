@@ -49,70 +49,11 @@ var SharedThing = class {
 export { SharedThing };
 ```
 
-Next, we manually bundle the outputs from the previous step:
+We don't write these chunks to disk -- our plugin configures ESBuild to generate them in memory.
+
+Next, we manually combine these three chunks into a single one as follows:
 
 1. From `shared.js`, emit code that:
-   a. stores the original source of `shared.js` in `__sharedModuleSource`
-   b. evaluates that string immediately to provide the _actual_ exports from `shared.js` (e.g. `SharedThing` in the example above), storing them as `__sharedModuleExports`
-2. From `worker.js`, emit code that creates a `__workerModuleSource` string containing code that first evaluates `__sharedModuleSource` to get the shared module exports and then evaluates the source of `worker.js`. Using this string, create an object URL with which to instantiate the worker.
-
-Example output:
-
-```js
-(() => {
-  // shared.js
-  const __sharedModuleSource = `
-const __chunkExports = {};
-// src/shared.ts
-var SharedThing = class {
-  constructor() {
-    this.id = Math.random();
-  }
-};
-
-Object.defineProperty(__chunkExports, 'SharedThing', { get: () => SharedThing });
-
-return __chunkExports;`;
-  const __sharedModuleExports = new Function(__sharedModuleSource)();
-  const __workerSourceExports = (function () {
-    // worker.js
-    const __workerModuleSource =
-      `
-  const __sharedModuleExports = (function (){${__sharedModuleSource}})();` +
-      `
-// src/worker.ts
-function startWorker() {
-  console.log(\"worker\", new __sharedModuleExports['SharedThing']().id);
-}
-startWorker();`;
-    if (
-      typeof Blob !== "undefined" &&
-      URL &&
-      typeof URL.createObjectURL === "function"
-    ) {
-      return {
-        createWorker: () => {
-          const workerURL = URL.createObjectURL(
-            new Blob([__workerModuleSource], { type: "application/javascript" })
-          );
-          const worker = new Worker(workerURL);
-          URL.revokeObjectURL(workerURL);
-          return worker;
-        },
-      };
-    } else {
-      // Just for testing in Node
-      return {
-        createWorker: () => {
-          new Function(__workerModuleSource)();
-        },
-      };
-    }
-  })();
-
-  // src/main.ts
-
-  console.log("main", new __sharedModuleExports["SharedThing"]().id);
-  __workerSourceExports["createWorker"]();
-})();
-```
+   a. wraps the original source in a function, `__sharedModuleFn`.
+   b. evaluates that function immediately to provide the _actual_ exports from `shared.js` (e.g. `SharedThing` in the example above), storing them as `__sharedModuleExports`
+2. From `worker.js`, emit code that creates a `__workerFn` function that accepts an object holding the exports from the shared module, and then code that uses Function.toString() to assemble both of these, at runtime, into a string containing the full source of the worker. This string is used to create an object URL with which to instantiate the worker.
