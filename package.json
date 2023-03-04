@@ -1,6 +1,6 @@
 {
   "name": "@desmos/esbuild-worker-dedupe",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/desmosinc/esbuild-worker-dedupe"
