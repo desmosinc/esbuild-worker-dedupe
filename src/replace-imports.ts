@@ -11,8 +11,6 @@ export function replaceImports(
   code: MagicString,
   getExportsObjectName: (i: estree.ImportDeclaration) => string | false
 ) {
-  const originalCode = code.toString();
-
   context.time("replaceImports::acorn");
   const ast = acorn.parse(code.original, {
     sourceType: "module",
