@@ -1,4 +1,5 @@
 import * as acorn from "acorn";
+import * as walk from "acorn-walk";
 import * as escope from "escope";
 import * as estree from "estree";
 import MagicString from "magic-string";
@@ -10,6 +11,8 @@ export function replaceImports(
   code: MagicString,
   getExportsObjectName: (i: estree.ImportDeclaration) => string | false
 ) {
+  const originalCode = code.toString();
+
   context.time("replaceImports::acorn");
   const ast = acorn.parse(code.original, {
     sourceType: "module",
@@ -19,6 +22,13 @@ export function replaceImports(
     locations: true,
   }) as estree.Node & acorn.Node;
   context.timeEnd("replaceImports::acorn");
+
+  context.time("replaceImports::parents");
+  const parents = new WeakMap<acorn.Node, acorn.Node>();
+  walk.fullAncestor(ast, (node, _state, ancestors) => {
+    parents.set(node, ancestors[ancestors.length - 2]);
+  });
+  context.timeEnd("replaceImports::parents");
 
   assert(ast.type === "Program", `Unexpected top-level node ${ast.type}`);
   const imports = ast.body.filter(
@@ -62,9 +72,17 @@ export function replaceImports(
       for (const identifier of variable?.identifiers ?? []) {
         const replacement = importIdentifiers.get(identifier);
         if (replacement) {
-          code.overwrite(range[0], range[1], replacement);
-          code.addSourcemapLocation(range[0]);
-          code.addSourcemapLocation(range[1]);
+          const parent = parents.get(
+            ref.identifier as unknown as acorn.Node
+          ) as estree.Node;
+          if (parent?.type === "Property" && parent.shorthand) {
+            code.appendRight(range[1], `: ${replacement}`);
+            code.addSourcemapLocation(range[1]);
+          } else {
+            code.overwrite(range[0], range[1], replacement);
+            code.addSourcemapLocation(range[0]);
+            code.addSourcemapLocation(range[1]);
+          }
           break;
         }
       }

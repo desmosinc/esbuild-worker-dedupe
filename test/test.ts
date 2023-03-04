@@ -3,6 +3,9 @@ import * as esbuild from "esbuild";
 import { inlineDedupedWorker } from "../src";
 import { Driver } from "./driver";
 import yargs from "yargs";
+import MagicString from "magic-string";
+import { replaceImports } from "../src/replace-imports";
+import { Context } from "../src/context";
 
 const MAX_TIME_MS = 5 * 1000;
 
@@ -91,10 +94,33 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
       );
     },
   },
+  {
+    label: "replaceImports: property shorthand",
+    fn: async () => {
+      const code = `
+import {prop} from './shared';
+const API = { prop };`;
+
+      const ms = new MagicString(code);
+      replaceImports(
+        new Context({ logLevel: "silent" }),
+        ms,
+        () => `__sharedModuleExports`
+      );
+
+      assert.equal(
+        ms.toString().trim(),
+        `const API = { prop: __sharedModuleExports['prop'] };`
+      );
+    },
+  },
 ];
 
 async function main() {
-  for (const { label, fn } of tests) {
+  const argv = await getArgv();
+  const filter = argv.filter ? new RegExp(argv.filter) : /.*/;
+
+  for (const { label, fn } of tests.filter((t) => filter.test(t.label))) {
     try {
       await withTimeout(fn, MAX_TIME_MS);
       console.log(`✅ ${label}`);
@@ -121,6 +147,10 @@ function getArgv() {
   return yargs.options({
     debug: {
       type: "boolean",
+    },
+    filter: {
+      alias: "f",
+      type: "string",
     },
   }).argv;
 }
