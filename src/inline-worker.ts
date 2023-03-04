@@ -36,7 +36,7 @@ export async function inlineWorker(opts: {
   const workerMs = new MagicString(opts.worker);
 
   ctx.time("compile shared");
-  replaceExports(ctx, sharedMs, "__chunkExports");
+  replaceExports(ctx, sharedMs, "__chunkExports", undefined);
   sharedMs.prepend(`// shared.js
   const __sharedModuleFn = () => {
     const __chunkExports = {};`);
@@ -49,7 +49,12 @@ export async function inlineWorker(opts: {
 
   ctx.time("compile main");
 
-  replaceExports(ctx, mainMs, `(typeof self !== 'undefined' ? self : this)`);
+  replaceExports(
+    ctx,
+    mainMs,
+    `(typeof self !== 'undefined' ? self : this)`,
+    "__defaultExport"
+  );
 
   replaceImports(ctx, mainMs, (i) => {
     const source = i.source.value as string;
@@ -61,7 +66,12 @@ export async function inlineWorker(opts: {
 
   ctx.time("compile worker");
   replaceImports(ctx, workerMs, () => "__sharedModuleExports");
-  replaceExports(ctx, workerMs, `(typeof self !== 'undefined' ? self : this)`);
+  replaceExports(
+    ctx,
+    workerMs,
+    `(typeof self !== 'undefined' ? self : this)`,
+    "__defaultExport"
+  );
   workerMs
     .prepend(`const __workerFn = (__sharedModuleExports) => {`)
     .append(`\n};`);

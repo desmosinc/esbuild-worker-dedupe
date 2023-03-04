@@ -40,8 +40,8 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
         `,
       });
       const { result, errors } = await driver.run(async (page) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return page.evaluate(function () {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return (window as any).results;
         });
       });
@@ -82,8 +82,50 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
         `,
       });
       const { result, errors } = await driver.run(async (page) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return page.evaluate(function () {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (window as any).results;
+        });
+      });
+      assert.deepEqual(errors, [], "no errors");
+      assert.ok(
+        result.main && result.worker && result.main !== result.worker,
+        "Worker loaded and worked"
+      );
+    },
+  },
+  {
+    label: "regression: handle entry/worker default exports",
+    fn: async () => {
+      const build = await esbuild.build({
+        entryPoints: {
+          main: `${__dirname}/entry-export/main.ts`,
+          worker: `${__dirname}/entry-export/worker.ts`,
+        },
+        bundle: true,
+        write: false,
+        outfile: "bundle.js",
+        plugins: [
+          inlineDedupedWorker({
+            createWorkerModule: "create-worker",
+          }),
+        ],
+      });
+
+      const js = build.outputFiles[0].text;
+
+      const driver = await getDriver();
+      await driver.load({
+        type: "html",
+        html: `
+          <html><head><script>
+          ${js}
+          </script></head></html>
+        `,
+      });
+      const { result, errors } = await driver.run(async (page) => {
+        return page.evaluate(function () {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return (window as any).results;
         });
       });
