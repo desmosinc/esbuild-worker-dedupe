@@ -6,6 +6,10 @@ import MagicString from "magic-string";
 import { inlineSourceMapComment } from "./source-maps";
 import { SourceMapConsumer, SourceMapGenerator } from "source-map";
 
+function variable(base: string) {
+  return `__dcg_${base}__`;
+}
+
 /**
  * Build a single bundle with the `worker` source inlined from the output of a code-splitting build
  * with two entrypoints: the main thread code and the worker code.
@@ -35,61 +39,59 @@ export async function inlineWorker(opts: {
   const sharedMs = new MagicString(opts.shared);
   const workerMs = new MagicString(opts.worker);
 
+  const CHUNK_EXPORTS = variable("chunk_exports");
+  const SHARED_MODULE_FN = variable("shared_module");
+  const SHARED_MODULE_EXPORTS = variable("shared_module_exports");
+  const WORKER_SOURCE_EXPORTS = variable("worker_source_exports");
+
   ctx.time("compile shared");
-  replaceExports(ctx, sharedMs, "__chunkExports", undefined);
+  replaceExports(ctx, sharedMs, CHUNK_EXPORTS, undefined);
   sharedMs.prepend(`// shared.js
-  const __sharedModuleFn = () => {
-    const __chunkExports = {};`);
+  const ${SHARED_MODULE_FN} = () => {
+    const ${CHUNK_EXPORTS} = {};`);
   sharedMs.append(`
-    return __chunkExports;
+    return ${CHUNK_EXPORTS};
   };
-  const __sharedModuleExports = __sharedModuleFn();`);
+  const ${SHARED_MODULE_EXPORTS} = ${SHARED_MODULE_FN}();`);
 
   ctx.timeEnd("compile shared");
 
   ctx.time("compile main");
 
-  replaceExports(
-    ctx,
-    mainMs,
-    `(typeof self !== 'undefined' ? self : this)`,
-    "__defaultExport"
-  );
+  replaceExports(ctx, mainMs, undefined, undefined);
 
   replaceImports(ctx, mainMs, (i) => {
     const source = i.source.value as string;
-    if (source === createWorkerModule) return "__workerSourceExports";
-    return "__sharedModuleExports";
+    if (source === createWorkerModule) return WORKER_SOURCE_EXPORTS;
+    return SHARED_MODULE_EXPORTS;
   });
 
   ctx.timeEnd("compile main");
 
   ctx.time("compile worker");
-  replaceImports(ctx, workerMs, () => "__sharedModuleExports");
-  replaceExports(
-    ctx,
-    workerMs,
-    `(typeof self !== 'undefined' ? self : this)`,
-    "__defaultExport"
-  );
+  replaceImports(ctx, workerMs, () => SHARED_MODULE_EXPORTS);
+  replaceExports(ctx, workerMs, undefined, undefined);
+
+  const WORKER_MODULE_FN = variable("worker_module");
+  const WORKER_MODULE_SOURCE = variable("worker_module_source");
   workerMs
-    .prepend(`const __workerFn = (__sharedModuleExports) => {`)
+    .prepend(`const ${WORKER_MODULE_FN} = (${SHARED_MODULE_EXPORTS}) => {`)
     .append(`\n};`);
   ctx.timeEnd("compile worker");
 
   mainMs.prepend(
     `
-  const __workerSourceExports = (function () {
+  const ${WORKER_SOURCE_EXPORTS} = (function () {
     // worker.js
-    const __workerModuleSource = \`
-      const __sharedModuleFn = \${__sharedModuleFn.toString()};
-      const __workerFn = \${__workerFn.toString()};
-      __workerFn(__sharedModuleFn());\`
+    const ${WORKER_MODULE_SOURCE} = \`
+      const ${SHARED_MODULE_FN} = \${${SHARED_MODULE_FN}.toString()};
+      const ${WORKER_MODULE_FN} = \${${WORKER_MODULE_FN}.toString()};
+      ${WORKER_MODULE_FN}(${SHARED_MODULE_FN}());\`
 
     let createWorker;
     if (typeof Blob !== 'undefined' && URL && typeof URL.createObjectURL === 'function') {
       createWorker = () => {
-        const workerURL = URL.createObjectURL(new Blob([__workerModuleSource], { type: 'application/javascript' }))
+        const workerURL = URL.createObjectURL(new Blob([${WORKER_MODULE_SOURCE}], { type: 'application/javascript' }))
         const worker = new Worker(workerURL);
         worker.revokeObjectURL = () => {
           URL.revokeObjectURL(workerURL);
@@ -99,7 +101,7 @@ export async function inlineWorker(opts: {
     } else {
       // Just for testing in Node
       createWorker = () => {
-        (new Function(__workerModuleSource))();
+        (new Function(${WORKER_MODULE_SOURCE}))();
       }
     }
 

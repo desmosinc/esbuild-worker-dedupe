@@ -6,7 +6,7 @@ import { Context } from "./context";
 export function replaceExports(
   context: Context,
   code: MagicString,
-  namedExportsObjectVariable: string,
+  namedExportsObjectVariable: string | undefined,
   defaultExportVariable: string | undefined
 ) {
   context.time("repaceExports::acorn");
@@ -24,28 +24,28 @@ export function replaceExports(
       code.addSourcemapLocation(start);
       code.addSourcemapLocation(end);
     } else if (statement.type === "ExportDefaultDeclaration") {
-      if (!defaultExportVariable) {
-        throw new Error(
-          `Unexpected default export: "${getSource(code, statement)}"`
-        );
-      }
-
       const { start, end } = statement as acorn.Node & estree.Node;
       const exportValue = getSource(code, statement.declaration);
 
-      code.overwrite(
-        start,
-        end,
-        `const ${defaultExportVariable} = ${exportValue}`
-      );
+      const replacement = defaultExportVariable
+        ? `const ${defaultExportVariable} = ${exportValue}`
+        : `(${exportValue})`;
+
+      code.overwrite(start, end, replacement);
       code.addSourcemapLocation(start);
       code.addSourcemapLocation(end);
     }
   }
 }
 
-function compileExport(e: estree.ExportNamedDeclaration, target: string) {
+function compileExport(
+  e: estree.ExportNamedDeclaration,
+  target: string | undefined
+) {
   if (!e.declaration) {
+    // If we aren't assigning the exports to anything, we don't actually need to write any code,
+    // because exports without declarations don't have any side effects -- they're just identifier names.
+    if (!target) return "";
     // export {a, v1 as b, ...}
     return e.specifiers
       .map(
