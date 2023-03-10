@@ -156,6 +156,59 @@ const API = { prop };`;
       );
     },
   },
+  {
+    label: "throw an error if the create worker module is never used",
+    fn: async () => {
+      let errors: esbuild.Message[];
+      try {
+        await esbuild.build({
+          entryPoints: {
+            main: "main.js",
+            worker: "worker.js",
+          },
+          bundle: true,
+          write: false,
+          outfile: "bundle.js",
+          plugins: [
+            {
+              name: "load",
+              setup(build) {
+                build.onResolve({ filter: /.*/ }, (args) => ({
+                  path: args.path,
+                  namespace: "test",
+                }));
+                build.onLoad({ filter: /.*/ }, (args) => {
+                  if (args.path === "main.js") {
+                    return {
+                      contents: `console.log('this is the main thread');`,
+                    };
+                  } else {
+                    return { contents: `console.log('this is the worker')` };
+                  }
+                });
+              },
+            },
+            inlineDedupedWorker({
+              createWorkerModule: "create-worker",
+            }),
+          ],
+        });
+        errors = [];
+      } catch (e: unknown) {
+        errors = (e as esbuild.BuildFailure).errors;
+      }
+
+      assert.deepEqual(errors, [
+        {
+          detail: null,
+          location: null,
+          notes: [],
+          pluginName: "inline-deduped-worker",
+          text: 'Expected worker to be used, but found no import for "create-worker"',
+        },
+      ]);
+    },
+  },
 ];
 
 async function main() {

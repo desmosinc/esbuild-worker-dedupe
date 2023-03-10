@@ -62,9 +62,11 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
           "^" + escapeRegExp(createWorkerModule) + "$"
         );
 
-        build.onResolve({ filter: createWorkerPattern }, () => ({
-          external: true,
-        }));
+        let foundCreateWorker = false;
+        build.onResolve({ filter: createWorkerPattern }, () => {
+          foundCreateWorker = true;
+          return { external: true };
+        });
 
         build.onStart(() => {
           ctx.clearTimers();
@@ -72,6 +74,18 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
         });
 
         build.onEnd(async (result) => {
+          if (!foundCreateWorker) {
+            result.errors.push({
+              pluginName: "inline-deduped-worker",
+              text: `Expected worker to be used, but found no import for "${createWorkerModule}"`,
+              location: null,
+              notes: [],
+              detail: null,
+            });
+
+            return;
+          }
+
           ctx.timeEnd("splitting");
           assert(result.outputFiles, "outputFiles");
           assert(
