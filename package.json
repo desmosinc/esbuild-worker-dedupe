@@ -31,6 +31,9 @@
     "typescript": "^4.6.2",
     "yargs": "^17.4.0"
   },
+  "peerDependencies": {
+    "esbuild": "^0.17.19"
+  },
   "devDependencies": {
     "@types/estree": "^0.0.51",
     "@types/mkdirp": "^1.0.2",
@@ -38,7 +41,7 @@
     "@types/yargs": "^17.0.10",
     "@typescript-eslint/eslint-plugin": "^5.17.0",
     "@typescript-eslint/parser": "^5.17.0",
-    "esbuild": "^0.14.27",
+    "esbuild": "^0.17.19",
     "eslint": "^8.12.0",
     "husky": ">=6",
     "lint-staged": ">=10",

@@ -200,7 +200,8 @@ const API = { prop };`;
 
       assert.deepEqual(errors, [
         {
-          detail: null,
+          detail: 0,
+          id: "",
           location: null,
           notes: [],
           pluginName: "inline-deduped-worker",

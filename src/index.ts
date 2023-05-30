@@ -75,15 +75,17 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
 
         build.onEnd(async (result) => {
           if (!foundCreateWorker) {
-            result.errors.push({
-              pluginName: "inline-deduped-worker",
-              text: `Expected worker to be used, but found no import for "${createWorkerModule}"`,
-              location: null,
-              notes: [],
-              detail: null,
-            });
-
-            return;
+            return {
+              errors: [
+                {
+                  pluginName: "inline-deduped-worker",
+                  text: `Expected worker to be used, but found no import for "${createWorkerModule}"`,
+                  location: null,
+                  notes: [],
+                  detail: null,
+                },
+              ],
+            };
           }
 
           ctx.timeEnd("splitting");
