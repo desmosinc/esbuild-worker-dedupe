@@ -15,8 +15,8 @@
   "scripts": {
     "test": "ts-node --transpile-only test/test.ts",
     "prepare": "husky install",
-    "watch": "esbuild ./src/index.js --outdir=build --bundle --platform=node --external:source-map --main-fields=main --sourcemap=linked --watch",
-    "build-plugin": "rm -rf build && esbuild src/index.ts --outdir=build --bundle --platform=node --external:source-map --main-fields=main --sourcemap=linked && cp src/types.ts build/index.d.ts",
+    "watch": "esbuild ./src/index.js --outdir=build --bundle --platform=node --target=node16 --external:source-map --main-fields=main --sourcemap=linked --watch",
+    "build-plugin": "rm -rf build && esbuild src/index.ts --outdir=build --bundle --platform=node --target=node16 --external:source-map --main-fields=main --sourcemap=linked && cp src/types.ts build/index.d.ts",
     "example": "./bundle.ts --main example/main.ts --worker example/worker.ts --outfile example/bundle.js && open example/index.html",
     "prepublishOnly": "yarn test && yarn build-plugin"
   },
