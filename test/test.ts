@@ -9,10 +9,13 @@ import { Context } from "../src/context";
 
 const MAX_TIME_MS = 5 * 1000;
 
-const tests: { label: string; fn: () => Promise<void> }[] = [
+const perStyleTests: {
+  label: string;
+  fn: (style: "eval" | "closure") => Promise<void>;
+}[] = [
   {
     label: "basic",
-    fn: async () => {
+    fn: async (style) => {
       const build = await esbuild.build({
         entryPoints: {
           main: `${__dirname}/basic/main.ts`,
@@ -23,6 +26,7 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
         outfile: "bundle.js",
         plugins: [
           inlineDedupedWorker({
+            style,
             createWorkerModule: "create-worker",
           }),
         ],
@@ -54,7 +58,7 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
   },
   {
     label: "regression: object property shorthand bug",
-    fn: async () => {
+    fn: async (style) => {
       const build = await esbuild.build({
         entryPoints: {
           main: `${__dirname}/property-shorthand/main.ts`,
@@ -65,6 +69,7 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
         outfile: "bundle.js",
         plugins: [
           inlineDedupedWorker({
+            style,
             createWorkerModule: "create-worker",
           }),
         ],
@@ -96,7 +101,7 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
   },
   {
     label: "regression: handle entry/worker default exports",
-    fn: async () => {
+    fn: async (style) => {
       const build = await esbuild.build({
         entryPoints: {
           main: `${__dirname}/entry-export/main.ts`,
@@ -107,6 +112,7 @@ const tests: { label: string; fn: () => Promise<void> }[] = [
         outfile: "bundle.js",
         plugins: [
           inlineDedupedWorker({
+            style,
             createWorkerModule: "create-worker",
           }),
         ],
@@ -158,7 +164,7 @@ const API = { prop };`;
   },
   {
     label: "throw an error if the create worker module is never used",
-    fn: async () => {
+    fn: async (style) => {
       let errors: esbuild.Message[];
       try {
         await esbuild.build({
@@ -189,6 +195,7 @@ const API = { prop };`;
               },
             },
             inlineDedupedWorker({
+              style,
               createWorkerModule: "create-worker",
             }),
           ],
@@ -210,6 +217,17 @@ const API = { prop };`;
       ]);
     },
   },
+];
+
+const tests: { label: string; fn: () => Promise<void> }[] = [
+  ...perStyleTests.map((test) => ({
+    label: `${test.label} (eval)`,
+    fn: async () => test.fn("eval"),
+  })),
+  ...perStyleTests.map((test) => ({
+    label: `${test.label} (closure)`,
+    fn: async () => test.fn("closure"),
+  })),
 ];
 
 async function main() {

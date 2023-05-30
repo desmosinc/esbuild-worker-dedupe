@@ -10,11 +10,131 @@ function variable(base: string) {
   return `__dcg_${base}__`;
 }
 
+export async function inlineWorker(opts: {
+  style: "eval" | "closure";
+  /**
+   * The main thread code. Expected to be an ES module with at most two imports: one from the shared chunk and one
+   * a module with the name given by `createWorkerModule` importing `{createWorker}`, e.g.
+   * `import {createWorker} from 'fake-create-worker'`.
+   */
+  main: string;
+  /**
+   * The worker thread code. Expected to be an ES module with one import, from the shared chunk.
+   */
+  worker: string;
+  /**
+   * The shared chunk. Expected to be an ES module with no imports.
+   */
+  shared: string;
+  sourcemaps?: Record<"main" | "worker" | "shared", string>;
+  createWorkerModule: string;
+  ctx: Context;
+}) {
+  return opts.style === "eval"
+    ? inlineWorkerWithEvalStyle(opts)
+    : inlineWorkerWithClosureStyle(opts);
+}
+
+async function inlineWorkerWithEvalStyle(opts: {
+  /**
+   * The main thread code. Expected to be an ES module with at most two imports: one from the shared chunk and one
+   * a module with the name given by `createWorkerModule` importing `{createWorker}`, e.g.
+   * `import {createWorker} from 'fake-create-worker'`.
+   */
+  main: string;
+  /**
+   * The worker thread code. Expected to be an ES module with one import, from the shared chunk.
+   */
+  worker: string;
+  /**
+   * The shared chunk. Expected to be an ES module with no imports.
+   */
+  shared: string;
+  sourcemaps?: Record<"main" | "worker" | "shared", string>;
+  createWorkerModule: string;
+  ctx: Context;
+}): Promise<string> {
+  const { ctx, createWorkerModule } = opts;
+
+  const mainMs = new MagicString(opts.main);
+  const workerMs = new MagicString(opts.worker);
+
+  const CHUNK_EXPORTS = variable("chunk_exports");
+  const SHARED_MODULE_SOURCE = variable("shared_module_source");
+  const SHARED_MODULE_EXPORTS = variable("shared_module_exports");
+  const WORKER_SOURCE_EXPORTS = variable("worker_source_exports");
+
+  const sharedMs = new MagicString(opts.shared);
+  replaceExports(ctx, sharedMs, CHUNK_EXPORTS, undefined);
+  // sharedMs is the shared module code, wrapped in an IIFE that returns an object with the exports
+  sharedMs.prepend(`// shared.js
+  (() => {
+    const ${CHUNK_EXPORTS} = {};`);
+  sharedMs.append(`
+    return ${CHUNK_EXPORTS};
+  })();`);
+
+  replaceExports(ctx, mainMs, undefined, undefined);
+  replaceImports(ctx, mainMs, (i) => {
+    const source = i.source.value as string;
+    if (source === createWorkerModule) return WORKER_SOURCE_EXPORTS;
+    return SHARED_MODULE_EXPORTS;
+  });
+
+  replaceImports(ctx, workerMs, () => SHARED_MODULE_EXPORTS);
+  replaceExports(ctx, workerMs, undefined, undefined);
+  const WORKER_MODULE_SRC = variable("worker_module");
+  const WORKER_SOURCE = variable("worker_source");
+  const WORKER_SHARED_MODULE_EXPORTS_REFERENCE = variable(
+    "worker_shared_module_exports"
+  );
+
+  mainMs.prepend(
+    `
+  const ${SHARED_MODULE_SOURCE} = ${JSON.stringify(sharedMs.toString())}
+  const ${SHARED_MODULE_EXPORTS} = eval(${SHARED_MODULE_SOURCE});
+  const ${WORKER_SOURCE_EXPORTS} = (function () {
+    // worker.js
+    const ${WORKER_SOURCE} = \`
+      // store the code for the worker module as a function that takes the shared module exports as an argument
+      const ${WORKER_MODULE_SRC} = (${SHARED_MODULE_EXPORTS}) => {
+\` + ${JSON.stringify(workerMs.toString())} + \`
+      };
+      // execute the shared module store its exports
+      const ${WORKER_SHARED_MODULE_EXPORTS_REFERENCE} = \${${SHARED_MODULE_SOURCE}};
+      // call the worker module, passing in the shared module exports
+      ${WORKER_MODULE_SRC}(${WORKER_SHARED_MODULE_EXPORTS_REFERENCE});\`
+
+    let createWorker;
+    if (typeof Blob !== 'undefined' && URL && typeof URL.createObjectURL === 'function') {
+      createWorker = () => {
+        const workerURL = URL.createObjectURL(new Blob([${WORKER_SOURCE}], { type: 'application/javascript' }))
+        const worker = new Worker(workerURL);
+        worker.revokeObjectURL = () => {
+          URL.revokeObjectURL(workerURL);
+        }
+        return worker;
+      }
+    } else {
+      // Just for testing in Node
+      createWorker = () => {
+        (new Function(${WORKER_SOURCE}))();
+      }
+    }
+
+    return {createWorker, default: {createWorker}};
+  })();
+  `
+  );
+
+  return mainMs.toString();
+}
+
 /**
  * Build a single bundle with the `worker` source inlined from the output of a code-splitting build
  * with two entrypoints: the main thread code and the worker code.
  */
-export async function inlineWorker(opts: {
+async function inlineWorkerWithClosureStyle(opts: {
   /**
    * The main thread code. Expected to be an ES module with at most two imports: one from the shared chunk and one
    * a module with the name given by `createWorkerModule` importing `{createWorker}`, e.g.

@@ -8,6 +8,7 @@ import * as public_types from "./types";
 
 export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
   function inlineDedupedWorker({
+    style,
     createWorkerModule,
     splitOutdir,
     logLevel,
@@ -130,6 +131,7 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
           }
 
           const finalJSBundle = await inlineWorker({
+            style,
             ctx,
             main: mainBundle.text,
             worker: workerBundle.text,

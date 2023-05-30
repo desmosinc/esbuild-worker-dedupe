@@ -12,6 +12,7 @@ async function main() {
     outdir: { type: "string" },
     "split-outdir": { type: "string" },
     outfile: { type: "string" },
+    style: { type: "string", choices: ["eval", "closure"], default: "eval" },
   }).argv;
 
   if (argv.outdir) {
@@ -34,6 +35,7 @@ async function main() {
     sourcemap: "inline",
     plugins: [
       inlineDedupedWorker({
+        style: argv.style as "eval" | "closure",
         createWorkerModule: "create-worker",
         splitOutdir: argv.splitOutdir,
       }),
