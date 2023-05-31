@@ -217,6 +217,50 @@ const API = { prop };`;
       ]);
     },
   },
+  {
+    label:
+      "regression test: evaluating shared module corrupting main thread scope",
+    fn: async (style) => {
+      const build = await esbuild.build({
+        entryPoints: {
+          main: `${__dirname}/corrupted-scope/main.js`,
+          worker: `${__dirname}/corrupted-scope/worker.js`,
+        },
+        bundle: true,
+        write: false,
+        outfile: "bundle.js",
+        minify: true,
+        plugins: [
+          inlineDedupedWorker({
+            style,
+            createWorkerModule: "create-worker",
+          }),
+        ],
+      });
+
+      const js = build.outputFiles[0].text;
+
+      const driver = await getDriver();
+      await driver.load({
+        type: "html",
+        html: `
+          <html><head><script>
+          ${js}
+          </script></head></html>
+        `,
+      });
+
+      const { result, errors } = await driver.run(async (page) => {
+        return page.evaluate(function () {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (window as any).result;
+        });
+      });
+
+      assert.deepEqual(errors, [], "no errors");
+      assert.equal(result, 1);
+    },
+  },
 ];
 
 const tests: { label: string; fn: () => Promise<void> }[] = [

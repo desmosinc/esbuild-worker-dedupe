@@ -13,6 +13,7 @@ async function main() {
     "split-outdir": { type: "string" },
     outfile: { type: "string" },
     style: { type: "string", choices: ["eval", "closure"], default: "eval" },
+    minify: { type: "boolean", default: false },
   }).argv;
 
   if (argv.outdir) {
@@ -33,6 +34,7 @@ async function main() {
     format: "esm",
     metafile: true,
     sourcemap: "inline",
+    minify: argv.minify,
     plugins: [
       inlineDedupedWorker({
         style: argv.style as "eval" | "closure",
