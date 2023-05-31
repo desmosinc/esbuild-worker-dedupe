@@ -127,6 +127,8 @@ async function inlineWorkerWithEvalStyle(opts: {
   `
   );
 
+  mainMs.prepend(`(() => {`).append(`})()`);
+
   return mainMs.toString();
 }
 
