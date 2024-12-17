@@ -7,7 +7,7 @@ export function replaceExports(
   context: Context,
   code: MagicString,
   namedExportsObjectVariable: string | undefined,
-  defaultExportVariable: string | undefined
+  defaultExportVariable: string | undefined,
 ) {
   context.time("repaceExports::acorn");
   const node = acorn.parse(code.original, {
@@ -40,7 +40,7 @@ export function replaceExports(
 
 function compileExport(
   e: estree.ExportNamedDeclaration,
-  target: string | undefined
+  target: string | undefined,
 ) {
   if (!e.declaration) {
     // If we aren't assigning the exports to anything, we don't actually need to write any code,
@@ -50,7 +50,7 @@ function compileExport(
     return e.specifiers
       .map(
         (spec) =>
-          `Object.defineProperty(${target}, '${spec.exported.name}', { get: () => ${spec.local.name} });`
+          `Object.defineProperty(${target}, '${spec.exported.name}', { get: () => ${spec.local.name} });`,
       )
       .join("\n");
   } else {

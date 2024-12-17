@@ -44,7 +44,7 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
 
         assert(
           !Array.isArray(initialOptions.entryPoints),
-          "entryPoints should be an object"
+          "entryPoints should be an object",
         );
 
         if (
@@ -53,14 +53,14 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
           Object.keys(initialOptions.entryPoints).length !== 2
         ) {
           throw new Error(
-            `Expected entryPoints to be an object of the form {main: ..., worker: ...}.`
+            `Expected entryPoints to be an object of the form {main: ..., worker: ...}.`,
           );
         }
 
         const mainEntryPoint = initialOptions.entryPoints.main;
 
         const createWorkerPattern = new RegExp(
-          "^" + escapeRegExp(createWorkerModule) + "$"
+          "^" + escapeRegExp(createWorkerModule) + "$",
         );
 
         let foundCreateWorker = false;
@@ -95,19 +95,19 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
             result.outputFiles.filter((o) => o.path.endsWith(".js")).length ===
               3,
             `Expected exactly 3 JS output files but found ${result.outputFiles.map(
-              (f) => f.path
-            )}`
+              (f) => f.path,
+            )}`,
           );
 
           const mainBundle = result.outputFiles.find((o) =>
-            o.path.endsWith("main.js")
+            o.path.endsWith("main.js"),
           );
           const workerBundle = result.outputFiles.find((o) =>
-            o.path.endsWith("worker.js")
+            o.path.endsWith("worker.js"),
           );
           const sharedBundle = result.outputFiles.find(
             (o) =>
-              o.path.endsWith(".js") && o.path.indexOf("__shared_chunk") >= 0
+              o.path.endsWith(".js") && o.path.indexOf("__shared_chunk") >= 0,
           );
           assert(workerBundle, "workerBundle");
           assert(mainBundle, "mainBundle");
@@ -116,13 +116,13 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
           let sourcemaps;
           if (initialOptions.sourcemap) {
             const main = result.outputFiles.find(
-              (o) => o.path === mainBundle.path + ".map"
+              (o) => o.path === mainBundle.path + ".map",
             )?.text;
             const worker = result.outputFiles.find(
-              (o) => o.path === workerBundle.path + ".map"
+              (o) => o.path === workerBundle.path + ".map",
             )?.text;
             const shared = result.outputFiles.find(
-              (o) => o.path === sharedBundle.path + ".map"
+              (o) => o.path === sharedBundle.path + ".map",
             )?.text;
             assert(main, "main sourcemap");
             assert(worker, "worker sourcemap");
@@ -145,11 +145,11 @@ export const inlineDedupedWorker: typeof public_types.inlineDedupedWorker =
             initialOptions.outfile ||
             path.resolve(
               initialOptions.outdir || process.cwd(),
-              basename.replace(/(\.ts|\.js)?$/, ".js")
+              basename.replace(/(\.ts|\.js)?$/, ".js"),
             );
 
           const cssFiles = result.outputFiles.filter((f) =>
-            f.path.endsWith(".css")
+            f.path.endsWith(".css"),
           );
 
           if (splitOutdir) {

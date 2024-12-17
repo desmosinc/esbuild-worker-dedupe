@@ -9,7 +9,7 @@ import { Context } from "./context";
 export function replaceImports(
   context: Context,
   code: MagicString,
-  getExportsObjectName: (i: estree.ImportDeclaration) => string | false
+  getExportsObjectName: (i: estree.ImportDeclaration) => string | false,
 ) {
   context.time("replaceImports::acorn");
   const ast = acorn.parse(code.original, {
@@ -30,7 +30,7 @@ export function replaceImports(
 
   assert(ast.type === "Program", `Unexpected top-level node ${ast.type}`);
   const imports = ast.body.filter(
-    (n): n is estree.ImportDeclaration => n.type === "ImportDeclaration"
+    (n): n is estree.ImportDeclaration => n.type === "ImportDeclaration",
   );
   const importIdentifiers = new Map<estree.Identifier, string>();
   for (const declaration of imports) {
@@ -46,8 +46,8 @@ export function replaceImports(
           spec.type === "ImportNamespaceSpecifier"
             ? exportsObjectName
             : spec.type === "ImportDefaultSpecifier"
-            ? `${exportsObjectName}.default`
-            : `${exportsObjectName}['${spec.imported.name}']`;
+              ? `${exportsObjectName}.default`
+              : `${exportsObjectName}['${spec.imported.name}']`;
 
         importIdentifiers.set(spec.local, replacement);
       }
@@ -71,7 +71,7 @@ export function replaceImports(
         const replacement = importIdentifiers.get(identifier);
         if (replacement) {
           const parent = parents.get(
-            ref.identifier as unknown as acorn.Node
+            ref.identifier as unknown as acorn.Node,
           ) as estree.Node;
           if (parent?.type === "Property" && parent.shorthand) {
             code.appendRight(range[1], `: ${replacement}`);

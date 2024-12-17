@@ -86,7 +86,7 @@ async function inlineWorkerWithEvalStyle(opts: {
   const WORKER_MODULE_SRC = variable("worker_module");
   const WORKER_SOURCE = variable("worker_source");
   const WORKER_SHARED_MODULE_EXPORTS_REFERENCE = variable(
-    "worker_shared_module_exports"
+    "worker_shared_module_exports",
   );
 
   mainMs.prepend(
@@ -124,7 +124,7 @@ async function inlineWorkerWithEvalStyle(opts: {
 
     return {createWorker, default: {createWorker}};
   })();
-  `
+  `,
   );
 
   mainMs.prepend(`(() => {`).append(`})()`);
@@ -229,7 +229,7 @@ async function inlineWorkerWithClosureStyle(opts: {
 
     return {createWorker, default: {createWorker}};
   })();
-  `
+  `,
   );
 
   const bundle = new Bundle();
@@ -262,12 +262,12 @@ async function inlineWorkerWithClosureStyle(opts: {
     addSourceMappingLocations(sourcemaps.worker, workerMs);
 
     const bundleMap = SourceMapGenerator.fromSourceMap(
-      await new SourceMapConsumer(bundle.generateMap({ includeContent: true }))
+      await new SourceMapConsumer(bundle.generateMap({ includeContent: true })),
     );
     for (const chunk in sourcemaps) {
       bundleMap.applySourceMap(
         sourcemaps[chunk as keyof typeof sourcemaps],
-        `<inline-worker-dedupe:${chunk}>`
+        `<inline-worker-dedupe:${chunk}>`,
       );
     }
 

@@ -11,7 +11,7 @@ declare module "escope" {
       ignoreEval?: boolean;
       sourceType?: "script" | "module";
       ecmaVersion: number;
-    }
+    },
   ): ScopeManager;
 
   class ScopeManager {

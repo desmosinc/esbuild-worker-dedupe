@@ -21,7 +21,7 @@ export class Driver {
   constructor(
     private options: {
       debug?: boolean;
-    }
+    },
   ) {}
 
   async destroy() {

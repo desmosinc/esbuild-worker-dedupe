@@ -52,7 +52,7 @@ const perStyleTests: {
       assert.deepEqual(errors, [], "no errors");
       assert.ok(
         result.main && result.worker && result.main !== result.worker,
-        "Worker loaded and worked"
+        "Worker loaded and worked",
       );
     },
   },
@@ -95,7 +95,7 @@ const perStyleTests: {
       assert.deepEqual(errors, [], "no errors");
       assert.ok(
         result.main && result.worker && result.main !== result.worker,
-        "Worker loaded and worked"
+        "Worker loaded and worked",
       );
     },
   },
@@ -138,7 +138,7 @@ const perStyleTests: {
       assert.deepEqual(errors, [], "no errors");
       assert.ok(
         result.main && result.worker && result.main !== result.worker,
-        "Worker loaded and worked"
+        "Worker loaded and worked",
       );
     },
   },
@@ -153,12 +153,12 @@ const API = { prop };`;
       replaceImports(
         new Context({ logLevel: "silent" }),
         ms,
-        () => `__sharedModuleExports`
+        () => `__sharedModuleExports`,
       );
 
       assert.equal(
         ms.toString().trim(),
-        `const API = { prop: __sharedModuleExports['prop'] };`
+        `const API = { prop: __sharedModuleExports['prop'] };`,
       );
     },
   },
