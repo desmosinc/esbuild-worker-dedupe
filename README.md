@@ -1,3 +1,9 @@
+# Deprecated
+
+This repo is no longer being maintained.
+
+---
+
 Proof of concept for inlining web worker code with esbuild with shared dependencies deduplicated.
 
 ## Try it
